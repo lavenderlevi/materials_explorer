@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Materials Explorer</title>
+<!-- Tailwind CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- GSAP + ScrollTrigger -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    --void: #07080C;
+    --surface: #0D0F16;
+    --surface-2: #11141D;
+    --line: #1B2030;
+    --text-hi: #F2F4F8;
+    --text-lo: #8B93A6;
+    --phosphor: #46E0C6;
+    --amber: #FFB454;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background-color: var(--void);
+    color: var(--text-hi);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  .font-display { font-family: 'Space Grotesk', sans-serif; }
+  .font-mono    { font-family: 'JetBrains Mono', monospace; }
+
+  /* CTA glow */
+  .cta-glow { box-shadow: 0 0 0 0 rgba(70,224,198,0); transition: box-shadow .35s ease, transform .3s ease; }
+  .cta-glow:hover { box-shadow: 0 0 36px 6px rgba(70,224,198,0.45); transform: translateY(-2px); }
+
+  /* Bento rotating border */
+  .bento-trace { isolation: isolate; position: relative; }
+  .bento-trace::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    z-index: 0;
+    opacity: 0;
+    background: conic-gradient(from 0deg, transparent 0%, var(--phosphor) 18%, transparent 36%);
+    animation: spin 2.6s linear infinite;
+    animation-play-state: paused;
+    transition: opacity .35s ease;
+  }
+  .bento-trace:hover::before, .bento-trace:focus-visible::before {
+    opacity: 1;
+    animation-play-state: running;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Marquee */
+  .marquee-track {
+    display: flex;
+    gap: 2.5rem;
+    white-space: nowrap;
+    width: max-content;
+    animation: marquee 28s linear infinite;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.875rem;
+    color: var(--text-lo);
+  }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  /* Nav */
+  nav {
+    position: fixed;
+    top: 0;
+    left: 0; right: 0;
+    z-index: 50;
+    transition: background .3s, border-color .3s, backdrop-filter .3s;
+    border-bottom: 1px solid transparent;
+  }
+  nav.scrolled {
+    backdrop-filter: blur(12px);
+    background: rgba(7,8,12,0.70);
+    border-bottom-color: var(--line);
+  }
+  .nav-inner {
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    height: 4rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.9375rem;
+    letter-spacing: -0.02em;
+    color: var(--text-hi);
+    text-decoration: none;
+  }
+  .nav-links { display: flex; align-items: center; gap: 2rem; }
+  .nav-links a {
+    font-size: 0.875rem;
+    color: var(--text-lo);
+    text-decoration: none;
+    transition: color .2s;
+  }
+  .nav-links a:hover { color: var(--text-hi); }
+  .nav-cta {
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--line);
+    color: var(--text-hi);
+    text-decoration: none;
+    transition: border-color .2s, color .2s;
+  }
+  .nav-cta:hover { border-color: var(--phosphor); color: var(--phosphor); }
+
+  /* Hero */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    padding-top: 4rem;
+  }
+  .hero-canvas-wrap {
+    position: absolute;
+    inset: -1rem;
+  }
+  canvas { width: 100%; height: 100%; display: block; }
+  .hero-vignette {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, var(--void), rgba(7,8,12,0.4) 50%, var(--void));
+  }
+  .hero-content {
+    position: relative;
+    z-index: 10;
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    width: 100%;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--phosphor);
+    border: 1px solid var(--line);
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    margin-bottom: 2rem;
+  }
+  .eyebrow .dot {
+    width: 0.375rem; height: 0.375rem;
+    border-radius: 50%;
+    background: var(--phosphor);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: 0.4; }
+  }
+  .hero h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(2.75rem, 8vw, 5.5rem);
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+    color: var(--text-hi);
+    max-width: 56rem;
+  }
+  .hero h1 span { display: block; overflow: hidden; }
+  .hero-sub {
+    margin-top: 1.75rem;
+    max-width: 36rem;
+    font-size: 1.0625rem;
+    color: var(--text-lo);
+    line-height: 1.7;
+  }
+  .hero-cta {
+    margin-top: 2.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+  }
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 0.75rem;
+    background: var(--phosphor);
+    color: #04130F;
+    font-weight: 600;
+    padding: 0.875rem 1.5rem;
+    text-decoration: none;
+    font-size: 0.9375rem;
+  }
+  .btn-ghost {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-lo);
+    text-decoration: none;
+    padding: 0.875rem 0.5rem;
+    transition: color .2s;
+  }
+  .btn-ghost:hover { color: var(--text-hi); }
+
+  /* Marquee strip */
+  .marquee-strip {
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    background: rgba(13,15,22,0.4);
+    overflow: hidden;
+    padding: 1rem 0;
+  }
+  .marquee-item { display: inline-flex; align-items: center; gap: 0.5rem; }
+  .marquee-dot { width: 0.25rem; height: 0.25rem; border-radius: 50%; background: var(--phosphor); }
+
+  /* Section shared */
+  section.content-section { position: relative; padding: 7rem 0 9rem; }
+  .section-inner { max-width: 80rem; margin: 0 auto; padding: 0 1.5rem; }
+  .section-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--phosphor); margin-bottom: 1rem; }
+  .section-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    color: var(--text-hi);
+    letter-spacing: -0.02em;
+    max-width: 36rem;
+    margin-bottom: 3.5rem;
+  }
+
+  /* Bento grid */
+  .bento-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: 220px;
+    gap: 1.25rem;
+  }
+  @media (max-width: 768px) {
+    .bento-grid { grid-template-columns: 1fr; }
+    .col-span-2, .row-span-2 { grid-column: auto; grid-row: auto; }
+  }
+  .col-span-2 { grid-column: span 2; }
+  .row-span-2 { grid-row: span 2; }
+  .bento-card-inner {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    border-radius: 1rem;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1.25rem;
+  }
+  .bento-trace { border-radius: 1rem; }
+  .card-header { display: flex; align-items: center; justify-content: space-between; }
+  .card-icon {
+    width: 2.5rem; height: 2.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6875rem;
+    color: var(--text-lo);
+    border: 1px solid var(--line);
+    border-radius: 9999px;
+    padding: 0.25rem 0.625rem;
+  }
+  .card-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.0625rem;
+    color: var(--text-hi);
+    margin-bottom: 0.5rem;
+  }
+  .card-desc { font-size: 0.875rem; color: var(--text-lo); line-height: 1.6; }
+
+  /* Pipeline */
+  .pipeline-section {
+    position: relative;
+    padding: 7rem 0;
+  }
+  .pipeline-inner {
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+    min-height: 80vh;
+  }
+  @media (max-width: 768px) {
+    .pipeline-inner { grid-template-columns: 1fr; min-height: auto; }
+  }
+  .pipeline-visual {
+    position: relative;
+    height: 420px;
+    border-radius: 1rem;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .pipeline-visual::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.04;
+    background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .stage-display {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--phosphor);
+    text-align: center;
+    padding: 2rem;
+    transition: opacity .4s ease;
+  }
+  .stage-num {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 6rem;
+    color: rgba(242,244,248,0.9);
+    line-height: 1;
+    margin-bottom: 1rem;
+  }
+  .stage-label { font-size: 0.8125rem; color: var(--text-lo); letter-spacing: 0.05em; }
+  .pipeline-stages { }
+  .pipeline-stage {
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    transition: opacity .4s ease;
+  }
+  .pipeline-stage:last-child { border-bottom: none; }
+  .pipeline-stage.active { opacity: 1 !important; }
+  .pipeline-stage:not(.active) { opacity: 0.2; }
+  .stage-header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 0.5rem; }
+  .stage-n { font-family: 'JetBrains Mono', monospace; font-size: 0.875rem; color: var(--phosphor); }
+  .stage-title { font-family: 'Space Grotesk', sans-serif; font-size: 1.375rem; color: var(--text-hi); }
+  .stage-body { font-size: 0.9rem; color: var(--text-lo); line-height: 1.65; padding-left: 2.25rem; }
+
+  /* Footer */
+  footer {
+    position: relative;
+    border-top: 1px solid var(--line);
+    padding: 4rem 0;
+  }
+  footer::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    backdrop-filter: blur(20px);
+    background: rgba(13,15,22,0.30);
+    z-index: 0;
+  }
+  .footer-inner {
+    position: relative;
+    z-index: 1;
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 2.5rem;
+  }
+  @media (max-width: 768px) {
+    .footer-grid { grid-template-columns: 1fr 1fr; }
+    .footer-brand { grid-column: span 2; }
+    .nav-links { display: none; }
+    .nav-cta { display: none; }
+    .bento-grid { grid-template-columns: 1fr; }
+  }
+  .footer-brand-name { font-family: 'Space Grotesk', sans-serif; color: var(--text-hi); margin-bottom: 0.75rem; }
+  .footer-brand-desc { font-size: 0.875rem; color: var(--text-lo); max-width: 18rem; line-height: 1.6; }
+  .footer-col h4 { font-size: 0.875rem; font-weight: 500; color: var(--text-hi); margin-bottom: 0.75rem; }
+  .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+  .footer-col a { font-size: 0.875rem; color: var(--text-lo); text-decoration: none; transition: color .2s; }
+  .footer-col a:hover { color: var(--phosphor); }
+  .footer-bottom {
+    margin-top: 3.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .footer-copy { font-size: 0.75rem; color: var(--text-lo); }
+  .status-badge { display: flex; align-items: center; gap: 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-lo); }
+  .status-dot { width: 0.375rem; height: 0.375rem; border-radius: 50%; background: var(--phosphor); animation: pulse 2s infinite; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="navbar">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <span class="font-mono" style="color:var(--phosphor)">[ME]</span>
+      Material&nbsp;Explorer
+    </a>
+    <div class="nav-links">
+      <a href="#features">Platform</a>
+      <a href="#pipeline">Pipeline</a>
+      <a href="#">Docs</a>
+    </div>
+    <a href="#" class="nav-cta">Launch Console</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-canvas-wrap" id="canvas-wrap">
+    <canvas id="lattice-canvas"></canvas>
+  </div>
+  <div class="hero-vignette"></div>
+  <div class="hero-content">
+    <div class="eyebrow" id="eyebrow">
+      <span class="dot"></span>
+      MP-API CONNECTED · 154,718 COMPOUNDS INDEXED
+    </div>
+    <h1>
+      <span><span id="line0">Redefining</span></span>
+      <span><span id="line1">Material Analysis</span></span>
+    </h1>
+    <p class="hero-sub" id="hero-sub">
+      Search, simulate, and predict semiconductor and crystalline
+      properties — backed by the Materials Project, ranked by a
+      five-factor relevance engine, scored to the decimal.
+    </p>
+    <div class="hero-cta" id="hero-cta">
+      <a href="#" class="btn-primary cta-glow">
+        Launch the Console <span aria-hidden>→</span>
+      </a>
+      <a href="#" class="btn-ghost">View the API docs</a>
+    </div>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="marquee-strip">
+  <div class="marquee-track" id="marquee-track"></div>
+</div>
+
+<!-- FEATURES -->
+<section class="content-section" id="features">
+  <div class="section-inner">
+    <p class="section-eyebrow">[ PLATFORM ]</p>
+    <h2 class="section-title">One engine for search, simulation, and prediction.</h2>
+    <div class="bento-grid" id="bento-grid"></div>
+  </div>
+</section>
+
+<!-- PIPELINE -->
+<section class="pipeline-section" id="pipeline">
+  <div class="pipeline-inner">
+    <div class="pipeline-visual" id="pipeline-visual"></div>
+    <div>
+      <p class="section-eyebrow">[ DATA PIPELINE ]</p>
+      <div class="pipeline-stages" id="pipeline-stages"></div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="footer-brand-name">
+          <span class="font-mono" style="color:var(--phosphor)">[ME]</span> Material Explorer
+        </div>
+        <p class="footer-brand-desc">
+          Computational materials search, ranking, and prediction — built on real DFT data.
+        </p>
+      </div>
+      <div class="footer-col">
+        <h4>Platform</h4>
+        <ul>
+          <li><a href="#">Search</a></li>
+          <li><a href="#">Predictions</a></li>
+          <li><a href="#">Workspace</a></li>
+          <li><a href="#">API</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="#">Documentation</a></li>
+          <li><a href="#">Changelog</a></li>
+          <li><a href="#">Status</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="#">About</a></li>
+          <li><a href="#">Github</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="footer-copy">
+        © 2026 Material Explorer. Data via the Materials Project. Not affiliated with the Materials Project consortium.
+      </p>
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        All systems operational
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+gsap.registerPlugin(ScrollTrigger);
+
+/* ── DATA ────────────────────────────────────────────── */
+const COMPOUNDS = [
+  "mp-149","Si","GaAs","Fe2O3","LiFePO4","BaTiO3",
+  "mp-1265","SiC","ZnO","mp-19017","Al2O3","GaN",
+];
+
+const FEATURES = [
+  {
+    title:"Semantic Search",
+    desc:'Describe a material in plain language — "stable wide-gap insulator for photovoltaics" — the embedding engine finds the match.',
+    tag:"all-MiniLM-L6-v2",
+    span:"col-span-2 row-span-2",
+    icon:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--phosphor)" stroke-width="1.6"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M19 19l-3.2-3.2" stroke-linecap="round"/><circle cx="8.5" cy="9" r="0.8" fill="var(--phosphor)" stroke="none"/><circle cx="12.5" cy="11.5" r="0.8" fill="var(--phosphor)" stroke="none"/></svg>`,
+  },
+  {
+    title:"Python-Native Core",
+    desc:"Built on pymatgen, scikit-learn, and the Materials Project API. Every score traces back to real DFT data.",
+    tag:"mp-api · pymatgen",
+    span:"",
+    icon:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--phosphor)" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  },
+  {
+    title:"ML Property Prediction",
+    desc:"Quantile gradient boosting predicts band gap, formation energy, and bulk modulus with 90% confidence intervals.",
+    tag:"p10 / p50 / p90",
+    span:"",
+    icon:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--phosphor)" stroke-width="1.6"><path d="M4 15a8 8 0 1 1 16 0"/><path d="M12 15l4-5" stroke-linecap="round"/><circle cx="12" cy="15" r="1" fill="var(--phosphor)" stroke="none"/></svg>`,
+  },
+  {
+    title:"Crystal Similarity",
+    desc:"Compare lattice geometry with 19-dimension structural fingerprints — not just chemical formula.",
+    tag:"StructureMatcher",
+    span:"col-span-2",
+    icon:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--phosphor)" stroke-width="1.6"><path d="M4 6h6v6H4zM14 6h6v6h-6zM9 9h5M4 18h6v-6M14 18h6v-6"/></svg>`,
+  },
+  {
+    title:"Real-Time Ranking",
+    desc:"Stability, completeness, exact match, popularity, and relevance — weighted into one 0–100 score, sub-200ms cached.",
+    tag:"5-factor engine",
+    span:"",
+    icon:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--phosphor)" stroke-width="1.6"><path d="M4 19V11M10 19V5M16 19v-8M22 19H2" stroke-linecap="round"/></svg>`,
+  },
+];
+
+const PIPELINE = [
+  { n:"01", title:"Ingest",    body:"Raw structures and properties stream from the Materials Project API and land in SQLite with a 7-day cache TTL." },
+  { n:"02", title:"Parse",     body:"Compiled-regex intent parsing classifies every query into one of six types — ID, formula, name, category, property, or mixed." },
+  { n:"03", title:"Rank",      body:"Stability, completeness, exact match, popularity, and application relevance are weighted into a single 0–100 score." },
+  { n:"04", title:"Visualize", body:"Band structures, correlation heatmaps, and crystal fingerprints render as interactive, explorable charts." },
+];
+
+/* ── NAVBAR ──────────────────────────────────────────── */
+window.addEventListener('scroll', () => {
+  document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 12);
+});
+
+/* ── MARQUEE ─────────────────────────────────────────── */
+(function buildMarquee() {
+  const track = document.getElementById('marquee-track');
+  const items = [...COMPOUNDS, ...COMPOUNDS];
+  track.innerHTML = items.map(c =>
+    `<span class="marquee-item"><span class="marquee-dot"></span>${c}</span>`
+  ).join('');
+})();
+
+/* ── BENTO GRID ──────────────────────────────────────── */
+(function buildBento() {
+  const grid = document.getElementById('bento-grid');
+  grid.innerHTML = FEATURES.map(f => `
+    <div class="bento-trace ${f.span}" tabindex="0">
+      <div class="bento-card-inner">
+        <div class="card-header">
+          <div class="card-icon">${f.icon}</div>
+          ${f.tag ? `<span class="card-tag">${f.tag}</span>` : ''}
+        </div>
+        <div>
+          <div class="card-title">${f.title}</div>
+          <div class="card-desc">${f.desc}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  // Scroll-reveal
+  gsap.fromTo(
+    '#bento-grid .bento-trace',
+    { opacity: 0, y: 32 },
+    {
+      opacity: 1, y: 0,
+      duration: 0.7, ease: 'power3.out', stagger: 0.1,
+      scrollTrigger: { trigger: '#features', start: 'top 75%' },
+    }
+  );
+})();
+
+/* ── PIPELINE ────────────────────────────────────────── */
+(function buildPipeline() {
+  // Visual panels
+  const visual = document.getElementById('pipeline-visual');
+  visual.innerHTML = PIPELINE.map((s, i) => `
+    <div class="stage-display" id="stage-display-${i}" style="opacity:${i===0?1:0}">
+      <div>
+        <div class="stage-num">${s.n}</div>
+        <div class="stage-label">${s.title.toUpperCase()}_STAGE.RUNNING</div>
+      </div>
+    </div>
+  `).join('');
+
+  // Text stages
+  const stages = document.getElementById('pipeline-stages');
+  stages.innerHTML = PIPELINE.map((s, i) => `
+    <div class="pipeline-stage ${i===0?'active':''}" data-idx="${i}">
+      <div class="stage-header">
+        <span class="stage-n">${s.n}</span>
+        <span class="stage-title">${s.title}</span>
+      </div>
+      <p class="stage-body">${s.body}</p>
+    </div>
+  `).join('');
+
+  function activateStage(idx) {
+    document.querySelectorAll('.pipeline-stage').forEach((el, i) => {
+      el.classList.toggle('active', i === idx);
+    });
+    document.querySelectorAll('.stage-display').forEach((el, i) => {
+      gsap.to(el, { opacity: i === idx ? 1 : 0, duration: 0.4 });
+    });
+  }
+
+  // Click to switch
+  document.querySelectorAll('.pipeline-stage').forEach(el => {
+    el.addEventListener('click', () => activateStage(+el.dataset.idx));
+  });
+
+  // Auto-cycle on scroll using ScrollTrigger
+  PIPELINE.forEach((_, i) => {
+    ScrollTrigger.create({
+      trigger: '#pipeline',
+      start: `top+=${i * 180} center`,
+      end:   `top+=${(i+1) * 180} center`,
+      onEnter:     () => activateStage(i),
+      onEnterBack: () => activateStage(i),
+    });
+  });
+})();
+
+/* ── LATTICE CANVAS ──────────────────────────────────── */
+(function initLattice() {
+  const canvas = document.getElementById('lattice-canvas');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('canvas-wrap');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const density = 64, pulseCount = 22, speed = 0.006;
+
+  let nodes = [], edges = [], pulses = [], raf = null;
+  let width = 0, height = 0;
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    width  = canvas.width  = rect.width  * dpr;
+    height = canvas.height = rect.height * dpr;
+  }
+
+  function buildLattice() {
+    nodes = []; edges = [];
+    const cols = Math.ceil(width  / (density * dpr)) + 1;
+    const rows = Math.ceil(height / (density * dpr)) + 1;
+    const step = density * dpr;
+    const idx  = (i, j) => i * (rows + 1) + j;
+
+    for (let i = 0; i <= cols; i++)
+      for (let j = 0; j <= rows; j++)
+        nodes.push({
+          x: i * step + (Math.random() - .5) * step * .35,
+          y: j * step + (Math.random() - .5) * step * .35,
+        });
+
+    for (let i = 0; i <= cols; i++)
+      for (let j = 0; j <= rows; j++) {
+        const a = idx(i, j);
+        if (i < cols) edges.push([a, idx(i+1, j)]);
+        if (j < rows) edges.push([a, idx(i, j+1)]);
+      }
+
+    pulses = Array.from({ length: pulseCount }, () => ({
+      edge:  Math.floor(Math.random() * edges.length),
+      t:     Math.random(),
+      speed: speed * (.6 + Math.random() * .8),
+    }));
+  }
+
+  function drawFrame() {
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.strokeStyle = 'rgba(70,224,198,0.06)';
+    ctx.lineWidth = 1 * dpr;
+    ctx.beginPath();
+    for (const [a, b] of edges) {
+      ctx.moveTo(nodes[a].x, nodes[a].y);
+      ctx.lineTo(nodes[b].x, nodes[b].y);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(70,224,198,0.18)';
+    for (const n of nodes) {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, 1.4 * dpr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    for (const p of pulses) {
+      const [a, b] = edges[p.edge];
+      const na = nodes[a], nb = nodes[b];
+      const x = na.x + (nb.x - na.x) * p.t;
+      const y = na.y + (nb.y - na.y) * p.t;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 10 * dpr);
+      g.addColorStop(0, 'rgba(70,224,198,0.9)');
+      g.addColorStop(1, 'rgba(70,224,198,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, 10 * dpr, 0, Math.PI * 2);
+      ctx.fill();
+      if (!reduced) {
+        p.t += p.speed;
+        if (p.t >= 1) { p.t = 0; p.edge = Math.floor(Math.random() * edges.length); }
+      }
+    }
+  }
+
+  function loop() { drawFrame(); if (!reduced) raf = requestAnimationFrame(loop); }
+
+  function onResize() { resize(); buildLattice(); drawFrame(); }
+
+  resize(); buildLattice();
+  reduced ? drawFrame() : (raf = requestAnimationFrame(loop));
+  window.addEventListener('resize', onResize);
+
+  // Pointer parallax
+  if (!window.matchMedia('(pointer: coarse)').matches) {
+    window.addEventListener('mousemove', e => {
+      const x = (e.clientX / innerWidth  - .5) * 14;
+      const y = (e.clientY / innerHeight - .5) * 14;
+      gsap.to(wrap, { x, y, duration: .8, ease: 'power3.out' });
+    });
+  }
+})();
+
+/* ── HERO GSAP ENTRANCE ──────────────────────────────── */
+(function heroEntrance() {
+  const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+  tl.from('#eyebrow',   { opacity: 0, y: 10, duration: .6 })
+    .from(['#line0','#line1'], { opacity: 0, y: 28, duration: .8, stagger: .12 }, '-=.2')
+    .from('#hero-sub',  { opacity: 0, y: 16, duration: .7 }, '-=.3')
+    .from('#hero-cta',  { opacity: 0, y: 12, duration: .6 }, '-=.4');
+})();
+</script>
+</body>
+</html>

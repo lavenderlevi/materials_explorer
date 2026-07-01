@@ -1,0 +1,27 @@
+# Core
+streamlit
+fastapi>=0.111
+uvicorn>=0.30
+pydantic>=2.0
+pydantic-settings>=2.0
+
+# Materials Project
+mp-api
+pymatgen
+
+# Data / ML
+pandas
+numpy
+scikit-learn>=1.4
+scipy>=1.13
+joblib>=1.4
+
+# Search & NLP
+sentence-transformers>=3.0
+rapidfuzz
+
+# Export
+openpyxl
+
+# Visualization (legacy Streamlit pages)
+plotly

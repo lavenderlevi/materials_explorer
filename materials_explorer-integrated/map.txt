@@ -1,0 +1,26 @@
+materials_explorer/
+  app.py                    ← updated (multi-page shell)
+  api/
+    main.py                 ← FastAPI service layer (Phase E)
+    routers/
+      search.py
+      predict.py
+      recommend.py
+  pages/                    ← Streamlit multi-page
+    1_Semantic_Search.py
+    2_Recommendations.py
+    3_Similar_Materials.py
+    4_ML_Predictions.py
+    5_Crystal_Similarity.py
+    6_Property_Correlation.py
+    7_Workspace.py
+  search/
+    (all existing files unchanged)
+    semantic.py             ← Phase A
+    similarity.py           ← Phase A
+    recommender.py          ← Phase B
+    ml_predict.py           ← Phase B
+    crystal.py              ← Phase C
+    correlation.py          ← Phase C
+    workspace.py            ← Phase D
+    service.py              ← Phase E (FastAPI abstraction)

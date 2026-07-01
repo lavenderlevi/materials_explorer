@@ -1,0 +1,1 @@
+"""Materials Explorer — FastAPI service package."""
